@@ -9,21 +9,21 @@ const generateToken = (id) => {
 
 // Inscription utilisateur
 exports.registerUser = asyncHandler(async (req, res) => {
-  const { name, email, password } = req.body;
+  const { name, telephone, password, role } = req.body;
 
-  const userExists = await User.findOne({ email });
+  const userExists = await User.findOne({ telephone });
 
   if (userExists) {
     return res.status(400).json({ success: false, message: 'Cet utilisateur existe déjà' });
   }
 
-  const user = await User.create({ name, email, password });
+  const user = await User.create({ name, telephone, password, role });
 
   if (user) {
     res.status(201).json({
       _id: user._id,
       name: user.name,
-      email: user.email,
+      telephone: user.telephone,
       role: user.role,
       token: generateToken(user._id),
     });
@@ -34,20 +34,20 @@ exports.registerUser = asyncHandler(async (req, res) => {
 
 // Connexion utilisateur
 exports.authUser = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const { telephone, password } = req.body;
 
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ telephone });
 
   if (user && (await user.matchPassword(password))) {
     res.json({
       _id: user._id,
       name: user.name,
-      email: user.email,
+      telephone: user.telephone,
       role: user.role,
       token: generateToken(user._id),
     });
   } else {
-    res.status(401).json({ success: false, message: 'Email ou mot de passe incorrect' });
+    res.status(401).json({ success: false, message: 'telephone ou mot de passe incorrect' });
   }
 });
 
@@ -59,7 +59,7 @@ exports.getUserProfile = asyncHandler(async (req, res) => {
     res.json({
       _id: user._id,
       name: user.name,
-      email: user.email,
+      telephone: user.telephone,
       role: user.role,
     });
   } else {

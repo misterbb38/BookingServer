@@ -1,6 +1,7 @@
 const express = require('express');
 const dotenv = require('dotenv');
 dotenv.config();
+const cors = require('cors')
 const connectDB = require('./config/db');
 const authRoutes = require('./routes/authRoutes');
 const terrainRoutes = require('./routes/terrainRoutes');
@@ -13,6 +14,11 @@ connectDB();
 const app = express();
 
 app.use(express.json());
+app.use(cors());
+// app.use(cors({
+//     origin: 'https://hist-front-app.onrender.com', // Autoriser seulement cette origine à accéder à l'API
+// }));
+
 
 // Routes
 app.use('/api/auth', authRoutes); // Routes pour l'authentification

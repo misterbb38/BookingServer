@@ -59,10 +59,10 @@ exports.deleteTerrain = asyncHandler(async (req, res) => {
   const terrain = await Terrain.findById(req.params.id);
 
   if (!terrain) {
-    res.status(404).json({ success: false, message: 'Terrain non trouvé' });
-    return;
+    return res.status(404).json({ success: false, message: 'Terrain non trouvé' });
   }
 
-  await terrain.remove();
+  await Terrain.findByIdAndDelete(req.params.id); // Remplace remove() par findByIdAndDelete()
+
   res.status(200).json({ success: true, message: 'Terrain supprimé avec succès' });
 });

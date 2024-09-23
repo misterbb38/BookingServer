@@ -6,6 +6,6 @@ const router = express.Router();
 router.post('/initiate-payment', requestPayment);
 
 // IPN pour mettre à jour le statut du paiement (accessible par PayTech)
-router.post('/ipn', updatePaymentStatus);
+ router.post('/ipn', updatePaymentStatus);
 
 module.exports = router;
