@@ -78,7 +78,7 @@ exports.createReservation = asyncHandler(async (req, res) => {
       item_price: minimumPayment,
       ref_command: reservationCode, // Utiliser le code de réservation comme référence de commande
       command_name: 'Paiement Réservation Terrain',
-      env: 'prod',
+      env: 'test',
       currency: "XOF", // Assurez-vous que la devise est incluse
     };
 
