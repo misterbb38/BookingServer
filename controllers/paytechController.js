@@ -12,7 +12,7 @@ exports.requestPayment = async (req, res) => {
     currency: "XOF",
     ref_command: req.body.ref_command || "REF12345600",
     command_name: req.body.command_name || "Paiement via PayTech",
-    env: "test",
+    env: "prod",
     ipn_url: process.env.PAYTECH_IPN_URL,
     success_url: process.env.PAYTECH_SUCCESS_URL,
     cancel_url: process.env.PAYTECH_CANCEL_URL,

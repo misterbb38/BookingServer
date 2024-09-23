@@ -28,131 +28,221 @@ const calculatePrice = (startTime, endTime, pricePerHour) => {
 };
 
 
-exports.createReservation = asyncHandler(async (req, res) => {
-  const {  fieldId, date, startTime, endTime, telephone, paymentMethod, paidAmount } = req.body;
 
-  // Empêcher la création de réservations pour des dates passées
-  const currentDate = new Date();
-  if (new Date(date) < currentDate) {
-    return res.status(400).json({ success: false, message: 'Impossible de réserver pour une date passée.' });
-  }
+// exports.createReservation = async (req, res) => {
+//   try {
+//     const { fieldId, date, startTime, endTime, telephone, paymentMethod } = req.body;
 
-  // Récupérer les détails de l'utilisateur et du terrain
-  // const userInfo = await User.findById(user);
-  const terrain = await Terrain.findById(fieldId);
+//     // Vérification de la date
+//     const currentDate = new Date();
+//     if (new Date(date) < currentDate) {
+//       return res.status(400).json({ success: false, message: 'Impossible de réserver pour une date passée.' });
+//     }
 
-  if (!terrain) {
-    return res.status(404).json({ success: false, message: 'Utilisateur ou terrain non trouvé' });
-  }
+//     // Détails du terrain
+//     const terrain = await Terrain.findById(fieldId);
+//     if (!terrain) {
+//       return res.status(404).json({ success: false, message: 'Terrain non trouvé' });
+//     }
 
-  // Calculer le prix total et générer un code de réservation unique
-  const totalPrice = calculatePrice(startTime, endTime, terrain.pricePerHour);
-  const reservationCode = generateReservationCode();
+//     // Calcul du prix total
+//     const totalPrice = calculatePrice(startTime, endTime, terrain.pricePerHour);
+//     const reservationCode = generateReservationCode();
 
-  // Vérifier que l'utilisateur a payé au moins 50% du total
-  const minimumPayment = totalPrice / 2;
-  if (paidAmount < minimumPayment) {
-    return res.status(400).json({ success: false, message: `Le paiement minimum requis est de ${minimumPayment}.` });
-  }
+//     // Création de la réservation
+//     const reservation = new Reservation({
+//       fieldId,
+//       date,
+//       startTime,
+//       endTime,
+//       telephone,
+//       totalPrice,
+//       status: 'pending',
+//       reservationCode,
+//     });
 
-  // Créer la réservation
-  const reservation = new Reservation({
-   
-    fieldId,
-    date,
-    startTime,
-    endTime,
-    telephone,
-    paymentMethod,
-    totalPrice,
-    status: paidAmount >= minimumPayment ? 'confirmed' : 'pending',
-    reservationCode
-  });
+//     await reservation.save();
 
-  const createdReservation = await reservation.save();
+//     let payments = [];
 
-  // Si l'utilisateur choisit de payer en ligne, initier le paiement via PayTech
-  if (paymentMethod === 'pay_online') {
-    const paymentRequestBody = {
-      item_name: `Réservation pour le terrain ${terrain.name}`,
-      item_price: minimumPayment,
-      ref_command: reservationCode, // Utiliser le code de réservation comme référence de commande
-      command_name: 'Paiement Réservation Terrain',
-      env: 'test',
-      currency: "XOF", // Assurez-vous que la devise est incluse
-    };
+//     if (paymentMethod === 'pay_online') {
+//       // Premier paiement (30%)
+//       const firstPaymentAmount = totalPrice * 0.3;
+//       const firstPaymentRefCommand = `${reservationCode}-A`;
 
-    const paymentResponse = await requestPayment({
-      body: { ...paymentRequestBody, reservationId: createdReservation._id },
-      headers: req.headers,
-    });
+//       const firstPaymentResponse = await requestPayment({
+//         body: {
+//           item_name: `Réservation pour le terrain ${terrain.name}`,
+//           item_price: firstPaymentAmount,
+//           ref_command: firstPaymentRefCommand,
+//           command_name: 'Premier Paiement Réservation Terrain',
+//           env: 'test',
+//           currency: "XOF",
+//           reservationId: reservation._id
+//         },
+//         headers: req.headers,
+//       });
 
-    // Afficher la réponse de PayTech pour le débogage
-    console.log("Réponse PayTech:", paymentResponse);
+//       // if (firstPaymentResponse && firstPaymentResponse.success) {
+//       //   const firstPayment = new Payment({
+//       //     reservation: reservation._id,
+//       //     item_name: `Réservation pour le terrain ${terrain.name}`,
+//       //     item_price: firstPaymentAmount,
+//       //     ref_command: firstPaymentRefCommand,
+//       //     command_name: 'Premier Paiement Réservation Terrain',
+//       //     payment_status: 'pending',
+//       //     token: firstPaymentResponse.token,
+//       //     redirect_url: firstPaymentResponse.redirect_url,
+//       //   });
 
-    // Vérifier si la réponse contient les informations attendues
-    if (paymentResponse && paymentResponse.success && paymentResponse.redirect_url && paymentResponse.token) {
-      // Créer un paiement associé à la réservation
-      const payment = new Payment({
-        reservation: createdReservation._id,
-        item_name: `Réservation pour le terrain ${terrain.name}`,
-        item_price: totalPrice,
-        ref_command: reservationCode, // Utiliser le code de réservation comme référence de commande
-        command_name: 'Paiement Réservation Terrain',
-        payment_status: 'pending',  // Le paiement est en attente
-        token: paymentResponse.token,
-        redirect_url: paymentResponse.redirect_url,
-      });
+//       //   await firstPayment.save();
+//       //   payments.push(firstPayment);
+//       // }
 
-      await payment.save();
+//       // Deuxième paiement (70%)
+//       const secondPaymentAmount = totalPrice * 0.7;
+//       const secondPaymentRefCommand = `${reservationCode}-B`;
 
-      // Associer le paiement à la réservation
-      createdReservation.payment = payment._id;
-      await createdReservation.save();
+//       const secondPaymentResponse = await requestPayment({
+//         body: {
+//           item_name: `Réservation pour le terrain ${terrain.name}`,
+//           item_price: secondPaymentAmount,
+//           ref_command: secondPaymentRefCommand,
+//           command_name: 'Deuxième Paiement Réservation Terrain',
+//           env: 'test',
+//           currency: "XOF",
+//           reservationId: reservation._id
+//         },
+//         headers: req.headers,
+//       });
 
-      // Rediriger l'utilisateur vers l'URL de paiement PayTech
-      return res.status(200).json({
-        success: true,
-        redirect_url: paymentResponse.redirect_url,
-        reservation: createdReservation,
-        payment: payment
-      });
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: 'Erreur lors de la création du paiement.',
-        details: paymentResponse || "Réponse PayTech manquante"
-      });
+//       // if (secondPaymentResponse && secondPaymentResponse.success) {
+//       //   const secondPayment = new Payment({
+//       //     reservation: reservation._id,
+//       //     item_name: `Réservation pour le terrain ${terrain.name}`,
+//       //     item_price: secondPaymentAmount,
+//       //     ref_command: secondPaymentRefCommand,
+//       //     command_name: 'Deuxième Paiement Réservation Terrain',
+//       //     payment_status: 'pending',
+//       //     token: secondPaymentResponse.token,
+//       //     redirect_url: secondPaymentResponse.redirect_url,
+//       //   });
+
+//       //   await secondPayment.save();
+//       //   payments.push(secondPayment);
+//       // }
+//     }
+
+//     return res.status(200).json({
+//       success: true,
+//       reservation: reservation,
+//       payments: payments
+//     });
+
+//   } catch (error) {
+//     console.error("Erreur lors de la création de la réservation:", error);
+//     return res.status(500).json({ success: false, message: 'Erreur technique lors de la création de la réservation.' });
+//   }
+// };
+
+
+exports.createReservation = async (req, res) => {
+  try {
+    const { fieldId, date, startTime, endTime, telephone, paymentMethod } = req.body;
+
+    // Vérification de la date
+    const currentDate = new Date();
+    if (new Date(date) < currentDate) {
+      return res.status(400).json({ success: false, message: 'Impossible de réserver pour une date passée.' });
     }
-  }
 
-  // Si l'utilisateur a payé sur place, la réservation est confirmée
-  if (paymentMethod === 'pay_on_site') {
-    // Créer un paiement marqué comme payé sur place
-    const payment = new Payment({
-      reservation: createdReservation._id,
-      item_name: `Réservation pour le terrain ${terrain.name}`,
-      item_price: totalPrice,
-      ref_command: reservationCode,
-      command_name: 'Paiement Réservation Terrain',
-      payment_status: 'success'
+    // Détails du terrain
+    const terrain = await Terrain.findById(fieldId);
+    if (!terrain) {
+      return res.status(404).json({ success: false, message: 'Terrain non trouvé' });
+    }
+
+    // Calcul du prix total
+    const totalPrice = calculatePrice(startTime, endTime, terrain.pricePerHour);
+    const reservationCode = generateReservationCode();
+
+    // Création de la réservation
+    const reservation = new Reservation({
+      fieldId,
+      date,
+      startTime,
+      endTime,
+      telephone,
+      totalPrice,
+      status: 'pending',
+      reservationCode,
     });
 
-    await payment.save();
+    await reservation.save();
 
-    // Associer le paiement à la réservation
-    createdReservation.payment = payment._id;
-    await createdReservation.save();
+    let payments = [];
 
-    // Envoyer un SMS de confirmation avec le code de réservation
-    const message = `Bonjour  votre réservation a été confirmée. Code de réservation : ${reservationCode}`;
-    await smsWrapper.sendSms({ numberTo: telephone, message });
+    if (paymentMethod === 'pay_online' || paymentMethod === 'pay_later') {
+      // Premier paiement (30%)
+      const firstPaymentAmount = totalPrice * 0.3;
+      const firstPaymentRefCommand = `${reservationCode}-avance`;
 
-    return res.status(201).json({ success: true, data: createdReservation, payment: payment });
+      const firstPaymentResponse = await requestPayment({
+        body: {
+          item_name: `Avance pour réservation ${terrain.name}`,
+          item_price: firstPaymentAmount,
+          ref_command: firstPaymentRefCommand,
+          command_name: 'Avance Réservation',
+          env: 'prod',
+          currency: "XOF",
+          reservationId: reservation._id
+        },
+        headers: req.headers,
+        
+      });
+      payments.push(firstPaymentResponse);
+
+       // Deuxième paiement (70%)
+      const secondPaymentAmount = totalPrice * 0.7;
+      const secondPaymentRefCommand = `${reservationCode}-reste`;
+
+      const secondPaymentResponse = await requestPayment({
+        body: {
+          item_name: `Reste pour réservation ${terrain.name}`,
+          item_price: secondPaymentAmount,
+          ref_command: secondPaymentRefCommand,
+          command_name: 'Paiement Final Réservation',
+          env: 'test',
+          currency: "XOF",
+          reservationId: reservation._id
+        },
+        headers: req.headers,
+      });
+      payments.push(secondPaymentResponse);
+
+      
+    }
+
+    return res.status(200).json({
+      success: true,
+      reservation: reservation,
+      payments: payments
+    });
+
+  } catch (error) {
+    console.error("Erreur lors de la création de la réservation:", error);
+    return res.status(500).json({ success: false, message: 'Erreur technique lors de la création de la réservation.' });
   }
+};
 
-  res.status(201).json({ success: true, data: createdReservation });
-});
+
+
+
+
+
+
+
+
 
 exports.getReservationByCode = asyncHandler(async (req, res) => {
   const { reservationCode } = req.params;
