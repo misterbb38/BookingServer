@@ -26,6 +26,12 @@ app.use('/api/terrains', terrainRoutes); // Routes pour les terrains
 app.use('/api/reservations', reservationRoutes); // Routes pour les réservations
 app.use('/api/payments', paymentRoutes); // Routes pour les paiements PayTech
 
+// Correction pour définir une route racine
+app.get('/', function (req, res) {
+  return res.status(200).json({ message: 'Welcome to the API' });
+});
+
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Serveur en cours d'exécution sur le port ${PORT}`);
