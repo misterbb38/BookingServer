@@ -1,5 +1,5 @@
 const asyncHandler = require('express-async-handler');
-const Payment = require('../models/paymentModel');
+const Payment = require('../models/PaymentModel');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 // Créer une demande de paiement via PayTech
