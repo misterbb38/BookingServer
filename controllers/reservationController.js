@@ -1,6 +1,6 @@
 const asyncHandler = require('express-async-handler');
 const Reservation = require('../models/reservationModel');
-const Payment = require('../models/paymentModel');
+const Payment = require('../models/PaymentModel');
 const User = require('../models/userModel');
 const Terrain = require('../models/terrainModel');
 const { SmsOrange } = require('smsorange');
@@ -28,127 +28,6 @@ const calculatePrice = (startTime, endTime, pricePerHour) => {
 };
 
 
-// Créer une réservation et générer un code de réservation
-// exports.createReservation = asyncHandler(async (req, res) => {
-//   const { user, fieldId, date, startTime, endTime, paymentMethod, paidAmount } = req.body;
-
-//   // Empêcher la création de réservations pour des dates passées
-//   const currentDate = new Date();
-//   if (new Date(date) < currentDate) {
-//     return res.status(400).json({ success: false, message: 'Impossible de réserver pour une date passée.' });
-//   }
-
-//   // Récupérer les détails de l'utilisateur et du terrain
-//   const userInfo = await User.findById(user);
-//   const terrain = await Terrain.findById(fieldId);
-
-//   if (!userInfo || !terrain) {
-//     return res.status(404).json({ success: false, message: 'Utilisateur ou terrain non trouvé' });
-//   }
-
-//   // Calculer le prix total et générer un code de réservation unique
-//   const totalPrice = calculatePrice(startTime, endTime, terrain.pricePerHour);
-//   const reservationCode = generateReservationCode();
-
-//   // Vérifier que l'utilisateur a payé au moins 50% du total
-//   const minimumPayment = totalPrice / 2;
-//   if (paidAmount < minimumPayment) {
-//     return res.status(400).json({ success: false, message: `Le paiement minimum requis est de ${minimumPayment}.` });
-//   }
-
-//   // Créer la réservation
-//   const reservation = new Reservation({
-//     user,
-//     fieldId,
-//     date,
-//     startTime,
-//     endTime,
-//     paymentMethod,
-//     totalPrice,
-//     status: paidAmount >= minimumPayment ? 'confirmed' : 'pending',
-//     reservationCode
-//   });
-
-//   const createdReservation = await reservation.save();
-
-//   // Si l'utilisateur choisit de payer en ligne, initier le paiement via PayTech
-//   if (paymentMethod === 'pay_online') {
-//     const paymentRequestBody = {
-//       item_name: `Réservation pour le terrain ${terrain.name}`,
-//       item_price: totalPrice,
-//       ref_command: reservationCode, // Utiliser le code de réservation comme référence de commande
-//       command_name: 'Paiement Réservation Terrain',
-//       env:'test',
-//       currency: "XOF", // Assurez-vous que la devise est incluse
-//     };
-
-//     const paymentResponse = await requestPayment({
-//       body: { ...paymentRequestBody, reservationId: createdReservation._id },
-//       headers: req.headers,
-//     });
-
-//     // Afficher la réponse de PayTech pour le débogage
-//     console.log("Réponse PayTech:", paymentResponse);
-
-//     // Vérifier si la réponse contient les informations attendues
-//     if (paymentResponse && paymentResponse.success && paymentResponse.redirect_url && paymentResponse.token) {
-//       // Créer un paiement associé à la réservation
-//       const payment = new Payment({
-//         reservation: createdReservation._id,
-//         item_name: `Réservation pour le terrain ${terrain.name}`,
-//         item_price: totalPrice,
-//         ref_command: reservationCode, // Utiliser le code de réservation comme référence de commande
-//         command_name: 'Paiement Réservation Terrain',
-//         payment_status: 'pending',  // Le paiement est en attente
-//         token: paymentResponse.token,
-//         redirect_url: paymentResponse.redirect_url,
-//       });
-
-//       await payment.save();
-
-//       // Rediriger l'utilisateur vers l'URL de paiement PayTech
-//       return res.status(200).json({
-//         success: true,
-//         redirect_url: paymentResponse.redirect_url,
-//         reservation: createdReservation,
-//         payment: payment
-//       });
-//     } else {
-//       return res.status(400).json({
-//         success: false,
-//         message: 'Erreur lors de la création du paiement.',
-//         details: paymentResponse || "Réponse PayTech manquante"
-//       });
-//     }
-//   }
-
-//   // Si l'utilisateur a payé sur place, la réservation est confirmée
-//   if (paymentMethod === 'pay_on_site') {
-//     // Créer un paiement marqué comme payé sur place
-//     const payment = new Payment({
-//       reservation: createdReservation._id,
-//       item_name: `Réservation pour le terrain ${terrain.name}`,
-//       item_price: totalPrice,
-//       ref_command: reservationCode,
-//       command_name: 'Paiement Réservation Terrain',
-//       payment_status: 'success'
-//     });
-
-//     await payment.save();
-
-//     // Associer le paiement à la réservation
-//     createdReservation.payment = payment._id;
-//     await createdReservation.save();
-
-//     // Envoyer un SMS de confirmation avec le code de réservation
-//     const message = `Bonjour ${userInfo.name}, votre réservation a été confirmée. Code de réservation : ${reservationCode}`;
-//     await smsWrapper.sendSms({ numberTo: userInfo.telephone, message });
-
-//     return res.status(201).json({ success: true, data: createdReservation, payment: payment });
-//   }
-
-//   res.status(201).json({ success: true, data: createdReservation });
-// });
 exports.createReservation = asyncHandler(async (req, res) => {
   const {  fieldId, date, startTime, endTime, telephone, paymentMethod, paidAmount } = req.body;
 
