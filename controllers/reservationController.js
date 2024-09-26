@@ -193,7 +193,7 @@ exports.createReservation = async (req, res) => {
           item_price: firstPaymentAmount,
           ref_command: firstPaymentRefCommand,
           command_name: 'Avance Réservation',
-          env: 'Prod',
+          env: 'prod',
           currency: "XOF",
           reservationId: reservation._id
         },
@@ -212,7 +212,7 @@ exports.createReservation = async (req, res) => {
           item_price: secondPaymentAmount,
           ref_command: secondPaymentRefCommand,
           command_name: 'Paiement Final Réservation',
-          env: 'Prod',
+          env: 'prod',
           currency: "XOF",
           reservationId: reservation._id
         },

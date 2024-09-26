@@ -12,7 +12,7 @@ exports.requestPayment = async (req, res) => {
     currency: "XOF",
     ref_command: req.body.ref_command || "REF12345600",
     command_name: req.body.command_name || "Paiement via PayTech",
-    env: "Prod",
+    env: "prod",
     ipn_url: process.env.PAYTECH_IPN_URL,
     success_url: process.env.PAYTECH_SUCCESS_URL,
     cancel_url: process.env.PAYTECH_CANCEL_URL,
@@ -45,7 +45,7 @@ console.log("En-têtes envoyés à PayTech:", headers);
         item_price: params.item_price,
         ref_command: params.ref_command,
         command_name: params.command_name,
-        env:'test',
+        env:'prod',
          currency: "XOF", // Assurez-vous que la devise est incluse
         payment_status: 'pending',
         token: jsonResponse.token,
