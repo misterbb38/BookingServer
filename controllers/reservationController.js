@@ -193,7 +193,7 @@ exports.createReservation = async (req, res) => {
           item_price: firstPaymentAmount,
           ref_command: firstPaymentRefCommand,
           command_name: 'Avance Réservation',
-          env: 'prod',
+          env: 'Prod',
           currency: "XOF",
           reservationId: reservation._id
         },
@@ -212,7 +212,7 @@ exports.createReservation = async (req, res) => {
           item_price: secondPaymentAmount,
           ref_command: secondPaymentRefCommand,
           command_name: 'Paiement Final Réservation',
-          env: 'test',
+          env: 'Prod',
           currency: "XOF",
           reservationId: reservation._id
         },
@@ -234,13 +234,6 @@ exports.createReservation = async (req, res) => {
     return res.status(500).json({ success: false, message: 'Erreur technique lors de la création de la réservation.' });
   }
 };
-
-
-
-
-
-
-
 
 
 
@@ -325,25 +318,6 @@ exports.deletePendingReservations = asyncHandler(async (req, res) => {
   });
 });
 
-// Vérifier la disponibilité d'un terrain pour une date donnée
-// exports.getFieldAvailability = asyncHandler(async (req, res) => {
-//   const fieldId = req.params.id;
-//   const date = req.query.date;
-
-//   if (!date) {
-//     return res.status(400).json({ success: false, message: 'La date est requise.' });
-//   }
-
-//   const reservations = await Reservation.find({ fieldId, date });
-
-//   const reservedTimes = reservations.map(reservation => ({
-//     startTime: reservation.startTime,
-//     endTime: reservation.endTime,
-//   }));
-
-//   res.status(200).json({ success: true, reservedTimes });
-// });
-// Fonction pour générer une liste d'heures dans une journée donnée
 const generateTimeSlots = (start, end) => {
   const timeSlots = [];
   let currentTime = start;
