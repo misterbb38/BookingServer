@@ -10,7 +10,7 @@ const ReservationSchema = new mongoose.Schema({
   paymentMethod: { type: String, enum: ['pay_online', 'pay_later'] },
   status: { type: String, enum: ['pending', 'confirmed', 'cancelled'], default: 'pending' },
   reservationCode: { type: String, unique: true, required: true }, // Code de réservation unique
-  firstpayment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment' },  // Référence au paiement
+  payments: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Payment' }], // Ajout du tableau de paiements  // Référence au paiement
   totalPrice: { type: Number, required: true },
   createdAt: { type: Date, default: Date.now }
 });

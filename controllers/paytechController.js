@@ -3,21 +3,10 @@ const Payment = require('../models/PaymentModel');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 // Créer une demande de paiement via PayTech
-exports.requestPayment = async (req, res) => {
-  const paymentRequestUrl = "https://paytech.sn/api/payment/request-payment";
-  const { reservationId } = req.body; // Récupérer l'ID de la réservation
-  const params = {
-    item_name: req.body.item_name || "Réservation terrain",
-    item_price: req.body.item_price || "10000",
-    currency: "XOF",
-    ref_command: req.body.ref_command || "REF12345600",
-    command_name: req.body.command_name || "Paiement via PayTech",
-    env: "prod",
-    ipn_url: process.env.PAYTECH_IPN_URL,
-    success_url: process.env.PAYTECH_SUCCESS_URL,
-    cancel_url: process.env.PAYTECH_CANCEL_URL,
-  };
 
+
+exports.requestPayment = async (params) => {
+  const paymentRequestUrl = "https://paytech.sn/api/payment/request-payment";
 
   const headers = {
     Accept: "application/json",
@@ -25,9 +14,7 @@ exports.requestPayment = async (req, res) => {
     API_KEY: process.env.PAYTECH_API_KEY,
     API_SECRET: process.env.PAYTECH_API_SECRET,
   };
-  // Afficher les informations avant l'envoi de la requête
-console.log("Paramètres envoyés à PayTech:", params);
-console.log("En-têtes envoyés à PayTech:", headers);
+
   try {
     const response = await fetch(paymentRequestUrl, {
       method: 'POST',
@@ -39,21 +26,6 @@ console.log("En-têtes envoyés à PayTech:", headers);
 
     // Vérifier que la réponse contient le champ "success" avec la valeur 1
     if (jsonResponse && jsonResponse.success === 1) {
-      const payment = new Payment({
-        reservation: reservationId, // Assigner la réservation associée
-        item_name: params.item_name,
-        item_price: params.item_price,
-        ref_command: params.ref_command,
-        command_name: params.command_name,
-        env:'prod',
-         currency: "XOF", // Assurez-vous que la devise est incluse
-        payment_status: 'pending',
-        token: jsonResponse.token,
-        redirect_url: jsonResponse.redirect_url,
-      });
-
-      await payment.save();
-
       // Retourner l'objet JSON de réponse
       return jsonResponse;
     } else {
@@ -65,65 +37,6 @@ console.log("En-têtes envoyés à PayTech:", headers);
   }
 };
 
-// exports.requestPayment = async (req, res) => {
-//   try {
-//     const { reservationId, item_name, item_price, ref_command, command_name } = req.body;
-
-//     if (!reservationId) {
-//       return res.status(400).json({ success: false, message: 'Reservation ID is required.' });
-//     }
-
-//     const paymentRequestUrl = "https://paytech.sn/api/payment/request-payment";
-//     const params = {
-//       item_name: item_name || "Réservation terrain",
-//       item_price: item_price || "10000",
-//       currency: "XOF",
-//       ref_command: ref_command || "REF12345600",
-//       command_name: command_name || "Paiement via PayTech",
-//       env: "test",
-//       ipn_url: process.env.PAYTECH_IPN_URL,
-//       success_url: process.env.PAYTECH_SUCCESS_URL,
-//       cancel_url: process.env.PAYTECH_CANCEL_URL,
-//     };
-
-//     const headers = {
-//       Accept: "application/json",
-//       'Content-Type': "application/json",
-//       API_KEY: process.env.PAYTECH_API_KEY,
-//       API_SECRET: process.env.PAYTECH_API_SECRET,
-//     };
-
-//     const response = await fetch(paymentRequestUrl, {
-//       method: 'POST',
-//       body: JSON.stringify(params),
-//       headers,
-//     });
-
-//     const jsonResponse = await response.json();
-
-//     if (jsonResponse && jsonResponse.success === 1) {
-//       const payment = new Payment({
-//         reservation: reservationId,
-//         item_name: params.item_name,
-//         item_price: params.item_price,
-//         ref_command: params.ref_command,
-//         command_name: params.command_name,
-//         payment_status: 'pending',
-//         token: jsonResponse.token,
-//         redirect_url: jsonResponse.redirect_url,
-//       });
-
-//       await payment.save();
-
-//       return res.status(200).json({ success: true, redirect_url: jsonResponse.redirect_url });
-//     } else {
-//       return res.status(400).json({ success: false, message: 'Erreur lors de la requête de paiement.' });
-//     }
-//   } catch (error) {
-//     console.error("Erreur lors de la requête à PayTech:", error);
-//     return res.status(500).json({ success: false, message: 'Erreur lors de la requête à PayTech.' });
-//   }
-// };
 
 
 

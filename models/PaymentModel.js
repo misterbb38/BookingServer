@@ -7,6 +7,7 @@ const PaymentSchema = new mongoose.Schema({
   currency: { type: String, default: 'XOF' },
   ref_command: { type: String,  required: true },
   command_name: { type: String, required: true },
+  env: { type: String, enum: ['test', 'prod'], default: 'test' }, // Ajout du champ 'env'
   payment_status: { type: String, enum: ['pending', 'success', 'failed'], default: 'pending' },
   token: { type: String },
   redirect_url: { type: String },

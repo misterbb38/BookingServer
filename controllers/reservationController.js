@@ -29,6 +29,8 @@ const calculatePrice = (startTime, endTime, pricePerHour) => {
 
 
 
+
+
 // exports.createReservation = async (req, res) => {
 //   try {
 //     const { fieldId, date, startTime, endTime, telephone, paymentMethod } = req.body;
@@ -65,72 +67,45 @@ const calculatePrice = (startTime, endTime, pricePerHour) => {
 
 //     let payments = [];
 
-//     if (paymentMethod === 'pay_online') {
+//     if (paymentMethod === 'pay_online' || paymentMethod === 'pay_later') {
 //       // Premier paiement (30%)
 //       const firstPaymentAmount = totalPrice * 0.3;
-//       const firstPaymentRefCommand = `${reservationCode}-A`;
+//       const firstPaymentRefCommand = `${reservationCode}-avance`;
 
 //       const firstPaymentResponse = await requestPayment({
 //         body: {
-//           item_name: `Réservation pour le terrain ${terrain.name}`,
+//           item_name: `Avance pour réservation ${terrain.name}`,
 //           item_price: firstPaymentAmount,
 //           ref_command: firstPaymentRefCommand,
-//           command_name: 'Premier Paiement Réservation Terrain',
-//           env: 'test',
+//           command_name: 'Avance Réservation',
+//           env: 'prod',
 //           currency: "XOF",
 //           reservationId: reservation._id
 //         },
 //         headers: req.headers,
+        
 //       });
+//       payments.push(firstPaymentResponse);
 
-//       // if (firstPaymentResponse && firstPaymentResponse.success) {
-//       //   const firstPayment = new Payment({
-//       //     reservation: reservation._id,
-//       //     item_name: `Réservation pour le terrain ${terrain.name}`,
-//       //     item_price: firstPaymentAmount,
-//       //     ref_command: firstPaymentRefCommand,
-//       //     command_name: 'Premier Paiement Réservation Terrain',
-//       //     payment_status: 'pending',
-//       //     token: firstPaymentResponse.token,
-//       //     redirect_url: firstPaymentResponse.redirect_url,
-//       //   });
-
-//       //   await firstPayment.save();
-//       //   payments.push(firstPayment);
-//       // }
-
-//       // Deuxième paiement (70%)
+//        // Deuxième paiement (70%)
 //       const secondPaymentAmount = totalPrice * 0.7;
-//       const secondPaymentRefCommand = `${reservationCode}-B`;
+//       const secondPaymentRefCommand = `${reservationCode}-reste`;
 
 //       const secondPaymentResponse = await requestPayment({
 //         body: {
-//           item_name: `Réservation pour le terrain ${terrain.name}`,
+//           item_name: `Reste pour réservation ${terrain.name}`,
 //           item_price: secondPaymentAmount,
 //           ref_command: secondPaymentRefCommand,
-//           command_name: 'Deuxième Paiement Réservation Terrain',
-//           env: 'test',
+//           command_name: 'Paiement Final Réservation',
+//           env: 'prod',
 //           currency: "XOF",
 //           reservationId: reservation._id
 //         },
 //         headers: req.headers,
 //       });
+//       payments.push(secondPaymentResponse);
 
-//       // if (secondPaymentResponse && secondPaymentResponse.success) {
-//       //   const secondPayment = new Payment({
-//       //     reservation: reservation._id,
-//       //     item_name: `Réservation pour le terrain ${terrain.name}`,
-//       //     item_price: secondPaymentAmount,
-//       //     ref_command: secondPaymentRefCommand,
-//       //     command_name: 'Deuxième Paiement Réservation Terrain',
-//       //     payment_status: 'pending',
-//       //     token: secondPaymentResponse.token,
-//       //     redirect_url: secondPaymentResponse.redirect_url,
-//       //   });
-
-//       //   await secondPayment.save();
-//       //   payments.push(secondPayment);
-//       // }
+      
 //     }
 
 //     return res.status(200).json({
@@ -144,6 +119,9 @@ const calculatePrice = (startTime, endTime, pricePerHour) => {
 //     return res.status(500).json({ success: false, message: 'Erreur technique lors de la création de la réservation.' });
 //   }
 // };
+// controllers/reservationController.js
+
+// controllers/reservationController.js
 
 
 exports.createReservation = async (req, res) => {
@@ -176,6 +154,7 @@ exports.createReservation = async (req, res) => {
       totalPrice,
       status: 'pending',
       reservationCode,
+      payments: [], // Initialisation du tableau de paiements
     });
 
     await reservation.save();
@@ -187,40 +166,92 @@ exports.createReservation = async (req, res) => {
       const firstPaymentAmount = totalPrice * 0.3;
       const firstPaymentRefCommand = `${reservationCode}-avance`;
 
-      const firstPaymentResponse = await requestPayment({
-        body: {
-          item_name: `Avance pour réservation ${terrain.name}`,
-          item_price: firstPaymentAmount,
-          ref_command: firstPaymentRefCommand,
-          command_name: 'Avance Réservation',
-          env: 'prod',
-          currency: "XOF",
-          reservationId: reservation._id
-        },
-        headers: req.headers,
-        
-      });
-      payments.push(firstPaymentResponse);
+      // Préparation des paramètres pour la requête à PayTech
+      const firstPaymentParams = {
+        item_name: `Avance pour réservation ${terrain.name}`,
+        item_price: firstPaymentAmount,
+        ref_command: firstPaymentRefCommand,
+        command_name: 'Avance Réservation',
+        env: 'test',
+        currency: "XOF",
+        reservationId: reservation._id,
+        ipn_url: process.env.PAYTECH_IPN_URL,
+        success_url: process.env.PAYTECH_SUCCESS_URL,
+        cancel_url: process.env.PAYTECH_CANCEL_URL,
+      };
 
-       // Deuxième paiement (70%)
+      // Appel à requestPayment
+      const firstPaymentResponse = await requestPayment(firstPaymentParams);
+
+      if (firstPaymentResponse && firstPaymentResponse.success === 1) {
+        // Création du premier paiement
+        const firstPayment = new Payment({
+          reservation: reservation._id,
+          item_name: firstPaymentParams.item_name,
+          item_price: firstPaymentParams.item_price,
+          currency: "XOF",
+          ref_command: firstPaymentParams.ref_command,
+          command_name: firstPaymentParams.command_name,
+          env: firstPaymentParams.env,
+          payment_status: 'pending',
+          token: firstPaymentResponse.token,
+          redirect_url: firstPaymentResponse.redirect_url,
+        });
+
+        await firstPayment.save();
+        payments.push(firstPayment);
+
+        // Ajouter l'ID du premier paiement à la réservation
+        reservation.payments.push(firstPayment._id);
+      } else {
+        throw new Error('Erreur lors de la création du premier paiement.');
+      }
+
+      // Deuxième paiement (70%)
       const secondPaymentAmount = totalPrice * 0.7;
       const secondPaymentRefCommand = `${reservationCode}-reste`;
 
-      const secondPaymentResponse = await requestPayment({
-        body: {
-          item_name: `Reste pour réservation ${terrain.name}`,
-          item_price: secondPaymentAmount,
-          ref_command: secondPaymentRefCommand,
-          command_name: 'Paiement Final Réservation',
-          env: 'prod',
-          currency: "XOF",
-          reservationId: reservation._id
-        },
-        headers: req.headers,
-      });
-      payments.push(secondPaymentResponse);
+      const secondPaymentParams = {
+        item_name: `Reste pour réservation ${terrain.name}`,
+        item_price: secondPaymentAmount,
+        ref_command: secondPaymentRefCommand,
+        command_name: 'Paiement Final Réservation',
+        env: 'test',
+        currency: "XOF",
+        reservationId: reservation._id,
+        ipn_url: process.env.PAYTECH_IPN_URL,
+        success_url: process.env.PAYTECH_SUCCESS_URL,
+        cancel_url: process.env.PAYTECH_CANCEL_URL,
+      };
 
-      
+      const secondPaymentResponse = await requestPayment(secondPaymentParams);
+
+      if (secondPaymentResponse && secondPaymentResponse.success === 1) {
+        // Création du second paiement
+        const secondPayment = new Payment({
+          reservation: reservation._id,
+          item_name: secondPaymentParams.item_name,
+          item_price: secondPaymentParams.item_price,
+          currency: "XOF",
+          ref_command: secondPaymentParams.ref_command,
+          command_name: secondPaymentParams.command_name,
+          env: secondPaymentParams.env,
+          payment_status: 'pending',
+          token: secondPaymentResponse.token,
+          redirect_url: secondPaymentResponse.redirect_url,
+        });
+
+        await secondPayment.save();
+        payments.push(secondPayment);
+
+        // Ajouter l'ID du second paiement à la réservation
+        reservation.payments.push(secondPayment._id);
+      } else {
+        throw new Error('Erreur lors de la création du second paiement.');
+      }
+
+      // Sauvegarder la réservation avec les paiements mis à jour
+      await reservation.save();
     }
 
     return res.status(200).json({
@@ -235,13 +266,135 @@ exports.createReservation = async (req, res) => {
   }
 };
 
+// controllers/reservationController.js
+
+exports.getReservations = asyncHandler(async (req, res) => {
+  try {
+    const { date, status } = req.query;
+
+    let query = {};
+
+    if (date) {
+      // Convertir la date en début et fin de journée
+      const startDate = new Date(date);
+      startDate.setHours(0, 0, 0, 0);
+      const endDate = new Date(date);
+      endDate.setHours(23, 59, 59, 999);
+
+      query.date = {
+        $gte: startDate,
+        $lte: endDate
+      };
+    }
+
+    if (status) {
+      query.status = status;
+    }
+
+    // Récupérer les réservations en fonction des filtres
+    const reservations = await Reservation.find(query)
+    .populate({
+      path: 'fieldId',
+      select: 'name',
+    })
+      .select(' reservationCode date startTime endTime telephone status '); // Sélectionner les champs nécessaires
+
+    res.status(200).json({ success: true, data: reservations });
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des réservations :", error);
+    return res.status(500).json({ success: false, message: 'Erreur lors de la récupération des réservations.' });
+  }
+});
+
+// controllers/reservationController.js
+
+exports.getReservationCounts = asyncHandler(async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+
+    let matchStage = {};
+
+    // Par défaut, on considère les réservations avec le statut 'confirmed'
+    if (status) {
+      matchStage.status = status;
+    } else {
+      matchStage.status = 'pending';
+    }
+
+    // Filtrage par plage de dates si fourni
+    if (startDate && endDate) {
+      matchStage.date = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    // Compter les réservations par jour
+    const dailyCounts = await Reservation.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m-%d", date: "$date" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    // Compter les réservations par semaine
+    const weeklyCounts = await Reservation.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            year: { $isoWeekYear: "$date" },
+            week: { $isoWeek: "$date" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.week': 1 } }
+    ]);
+
+    // Compter les réservations par mois
+    const monthlyCounts = await Reservation.aggregate([
+      { $match: matchStage },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: "%Y-%m", date: "$date" }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { '_id': 1 } }
+    ]);
+
+    res.status(200).json({
+      success: true,
+      dailyCounts,
+      weeklyCounts,
+      monthlyCounts
+    });
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des statistiques de réservations :", error);
+    return res.status(500).json({ success: false, message: 'Erreur lors de la récupération des statistiques de réservations.' });
+  }
+});
+
 
 
 exports.getReservationByCode = asyncHandler(async (req, res) => {
   const { reservationCode } = req.params;
 
   // Rechercher la réservation par le code
-  const reservation = await Reservation.findOne({ reservationCode }).populate('user fieldId');
+  const reservation = await Reservation.findOne({ reservationCode })
+    .populate('user fieldId')
+    .populate('payments'); // Peupler le tableau des paiements
 
   if (!reservation) {
     return res.status(404).json({ success: false, message: 'Réservation non trouvée.' });

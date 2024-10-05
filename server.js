@@ -21,7 +21,7 @@ app.use(cors());
 
 
 // Routes
-app.use('/api/auth', authRoutes); // Routes pour l'authentification
+app.use('/api/users', authRoutes); // Routes pour l'authentification
 app.use('/api/terrains', terrainRoutes); // Routes pour les terrains
 app.use('/api/reservations', reservationRoutes); // Routes pour les réservations
 app.use('/api/payments', paymentRoutes); // Routes pour les paiements PayTech
