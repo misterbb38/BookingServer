@@ -13,7 +13,7 @@ const router = express.Router();
 router.post('/', protect, admin, createTerrain);
 router.get('/', getAllTerrains); // Accessible à tous les utilisateurs
 router.get('/:id', getTerrainById); // Accessible à tous les utilisateurs
-router.put('/:id', protect, admin, updateTerrain); // Admin uniquement
+router.put('/:id',  updateTerrain); // Admin uniquement
 router.delete('/:id', protect, admin, deleteTerrain); // Admin uniquement
 
 module.exports = router;

@@ -66,3 +66,26 @@ exports.getUserProfile = asyncHandler(async (req, res) => {
     res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
   }
 });
+
+// Obtenir tous les utilisateurs
+exports.getAllUsers = asyncHandler(async (req, res) => {
+  const users = await User.find({}); // Récupérer tous les utilisateurs
+  if (users) {
+    res.json(users);
+  } else {
+    res.status(404).json({ success: false, message: 'Aucun utilisateur trouvé' });
+  }
+});
+
+// Supprimer un utilisateur
+exports.deleteUser = asyncHandler(async (req, res) => {
+  const user = await User.findById(req.params.id);
+
+  if (user) {
+    await User.deleteOne({ _id: req.params.id }); // Utiliser deleteOne() pour supprimer l'utilisateur
+    res.json({ success: true, message: 'Utilisateur supprimé avec succès' });
+  } else {
+    res.status(404).json({ success: false, message: 'Utilisateur non trouvé' });
+  }
+});
+
