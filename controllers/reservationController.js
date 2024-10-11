@@ -1,3 +1,5 @@
+// controllers/reservationController.js
+
 const asyncHandler = require('express-async-handler');
 const Reservation = require('../models/reservationModel');
 const Payment = require('../models/PaymentModel');
@@ -6,6 +8,8 @@ const Terrain = require('../models/terrainModel');
 const { SmsOrange } = require('smsorange');
 const crypto = require('crypto');  // Pour générer un code unique
 const { requestPayment } = require('./paytechController'); // Importer le contrôleur PayTech
+const mongoose = require('mongoose');
+const SMS = require('../models/smsModel'); // Importer le modèle SMS
 
 // Configurer l'API Orange SMS avec les variables d'environnement
 const smsWrapper = new SmsOrange({
@@ -20,113 +24,14 @@ const generateReservationCode = () => {
 };
 
 // Fonction pour calculer le prix total de la réservation
-const calculatePrice = (startTime, endTime, pricePerHour) => {
-  const startHour = parseInt(startTime.split(':')[0]);
-  const endHour = parseInt(endTime.split(':')[0]);
-  const hours = endHour - startHour;
-  return hours * pricePerHour;
+const calculatePrice = (time, pricePerHour) => {
+ 
+  return time * pricePerHour;
 };
-
-
-
-
-
-// exports.createReservation = async (req, res) => {
-//   try {
-//     const { fieldId, date, startTime, endTime, telephone, paymentMethod } = req.body;
-
-//     // Vérification de la date
-//     const currentDate = new Date();
-//     if (new Date(date) < currentDate) {
-//       return res.status(400).json({ success: false, message: 'Impossible de réserver pour une date passée.' });
-//     }
-
-//     // Détails du terrain
-//     const terrain = await Terrain.findById(fieldId);
-//     if (!terrain) {
-//       return res.status(404).json({ success: false, message: 'Terrain non trouvé' });
-//     }
-
-//     // Calcul du prix total
-//     const totalPrice = calculatePrice(startTime, endTime, terrain.pricePerHour);
-//     const reservationCode = generateReservationCode();
-
-//     // Création de la réservation
-//     const reservation = new Reservation({
-//       fieldId,
-//       date,
-//       startTime,
-//       endTime,
-//       telephone,
-//       totalPrice,
-//       status: 'pending',
-//       reservationCode,
-//     });
-
-//     await reservation.save();
-
-//     let payments = [];
-
-//     if (paymentMethod === 'pay_online' || paymentMethod === 'pay_later') {
-//       // Premier paiement (30%)
-//       const firstPaymentAmount = totalPrice * 0.3;
-//       const firstPaymentRefCommand = `${reservationCode}-avance`;
-
-//       const firstPaymentResponse = await requestPayment({
-//         body: {
-//           item_name: `Avance pour réservation ${terrain.name}`,
-//           item_price: firstPaymentAmount,
-//           ref_command: firstPaymentRefCommand,
-//           command_name: 'Avance Réservation',
-//           env: 'prod',
-//           currency: "XOF",
-//           reservationId: reservation._id
-//         },
-//         headers: req.headers,
-        
-//       });
-//       payments.push(firstPaymentResponse);
-
-//        // Deuxième paiement (70%)
-//       const secondPaymentAmount = totalPrice * 0.7;
-//       const secondPaymentRefCommand = `${reservationCode}-reste`;
-
-//       const secondPaymentResponse = await requestPayment({
-//         body: {
-//           item_name: `Reste pour réservation ${terrain.name}`,
-//           item_price: secondPaymentAmount,
-//           ref_command: secondPaymentRefCommand,
-//           command_name: 'Paiement Final Réservation',
-//           env: 'prod',
-//           currency: "XOF",
-//           reservationId: reservation._id
-//         },
-//         headers: req.headers,
-//       });
-//       payments.push(secondPaymentResponse);
-
-      
-//     }
-
-//     return res.status(200).json({
-//       success: true,
-//       reservation: reservation,
-//       payments: payments
-//     });
-
-//   } catch (error) {
-//     console.error("Erreur lors de la création de la réservation:", error);
-//     return res.status(500).json({ success: false, message: 'Erreur technique lors de la création de la réservation.' });
-//   }
-// };
-// controllers/reservationController.js
-
-// controllers/reservationController.js
-
 
 exports.createReservation = async (req, res) => {
   try {
-    const { fieldId, date, startTime, endTime, telephone, paymentMethod } = req.body;
+    const { fieldId, date, time, startTime, timeSlots, telephone, paymentMethod } = req.body;
 
     // Vérification de la date
     const currentDate = new Date();
@@ -141,16 +46,16 @@ exports.createReservation = async (req, res) => {
     }
 
     // Calcul du prix total
-    const totalPrice = calculatePrice(startTime, endTime, terrain.pricePerHour);
+    const totalPrice = calculatePrice(time, terrain.pricePerHour);
     const reservationCode = generateReservationCode();
 
     // Création de la réservation
     const reservation = new Reservation({
       fieldId,
       date,
-      startTime,
-      endTime,
+      startTime : timeSlots,
       telephone,
+      time,
       totalPrice,
       status: 'pending',
       reservationCode,
@@ -254,6 +159,50 @@ exports.createReservation = async (req, res) => {
       await reservation.save();
     }
 
+    // Envoi du SMS à l'utilisateur
+    const message = `Votre réservation a été créée avec succès. Votre code de réservation est : ${reservationCode}. Vous pouvez consulter et payer votre réservation en utilisant ce code.`;
+
+    try {
+      // Envoi du SMS via l'API Orange
+      const smsResponse = await smsWrapper.sendSms({
+        numberTo: telephone,
+        message: message,
+      });
+      
+
+      // Vérifier si le SMS a été envoyé avec succès
+      if (smsResponse && smsResponse.status === 'success') {
+        // Enregistrer le SMS dans la base de données
+        const smsRecord = new SMS({
+          phoneNumber: telephone,
+          message: message,
+          status: 'sent',
+          reservationId: reservation._id,
+        });
+        await smsRecord.save();
+      } else {
+        // En cas d'échec de l'envoi du SMS
+        console.error("Erreur lors de l'envoi du SMS:", smsResponse);
+        const smsRecord = new SMS({
+          phoneNumber: telephone,
+          message: message,
+          status: 'failed',
+          reservationId: reservation._id,
+        });
+        await smsRecord.save();
+      }
+    } catch (smsError) {
+      console.error("Erreur lors de l'envoi du SMS:", smsError);
+      // Enregistrer l'échec dans la base de données
+      const smsRecord = new SMS({
+        phoneNumber: telephone,
+        message: message,
+        status: 'failed',
+        reservationId: reservation._id,
+      });
+      await smsRecord.save();
+    }
+
     return res.status(200).json({
       success: true,
       reservation: reservation,
@@ -266,11 +215,50 @@ exports.createReservation = async (req, res) => {
   }
 };
 
+
 // controllers/reservationController.js
 
+// exports.getReservations = asyncHandler(async (req, res) => {
+//   try {
+//     const { date, status } = req.query;
+
+//     let query = {};
+
+//     if (date) {
+//       // Convertir la date en début et fin de journée
+//       const startDate = new Date(date);
+//       startDate.setHours(0, 0, 0, 0);
+//       const endDate = new Date(date);
+//       endDate.setHours(23, 59, 59, 999);
+
+//       query.date = {
+//         $gte: startDate,
+//         $lte: endDate
+//       };
+//     }
+
+//     if (status) {
+//       query.status = status;
+//     }
+
+//     // Récupérer les réservations en fonction des filtres
+//     const reservations = await Reservation.find(query)
+//     .populate({
+//       path: 'fieldId',
+//       select: 'name',
+//     })
+//       .select(' reservationCode date startTime endTime telephone status '); // Sélectionner les champs nécessaires
+
+//     res.status(200).json({ success: true, data: reservations });
+
+//   } catch (error) {
+//     console.error("Erreur lors de la récupération des réservations :", error);
+//     return res.status(500).json({ success: false, message: 'Erreur lors de la récupération des réservations.' });
+//   }
+// });
 exports.getReservations = asyncHandler(async (req, res) => {
   try {
-    const { date, status } = req.query;
+    const { date, status, fieldId } = req.query;
 
     let query = {};
 
@@ -291,13 +279,17 @@ exports.getReservations = asyncHandler(async (req, res) => {
       query.status = status;
     }
 
+    if (fieldId) {
+      query.fieldId = fieldId;
+    }
+
     // Récupérer les réservations en fonction des filtres
     const reservations = await Reservation.find(query)
-    .populate({
-      path: 'fieldId',
-      select: 'name',
-    })
-      .select(' reservationCode date startTime endTime telephone status '); // Sélectionner les champs nécessaires
+      .populate({
+        path: 'fieldId',
+        select: 'name',
+      })
+      .select('reservationCode date startTime endTime telephone status fieldId');
 
     res.status(200).json({ success: true, data: reservations });
 
@@ -309,9 +301,86 @@ exports.getReservations = asyncHandler(async (req, res) => {
 
 // controllers/reservationController.js
 
+// exports.getReservationCounts = asyncHandler(async (req, res) => {
+//   try {
+//     const { startDate, endDate, status } = req.query;
+
+//     let matchStage = {};
+
+//     // Par défaut, on considère les réservations avec le statut 'confirmed'
+//     if (status) {
+//       matchStage.status = status;
+//     } else {
+//       matchStage.status = 'pending';
+//     }
+
+//     // Filtrage par plage de dates si fourni
+//     if (startDate && endDate) {
+//       matchStage.date = {
+//         $gte: new Date(startDate),
+//         $lte: new Date(endDate)
+//       };
+//     }
+
+//     // Compter les réservations par jour
+//     const dailyCounts = await Reservation.aggregate([
+//       { $match: matchStage },
+//       {
+//         $group: {
+//           _id: {
+//             $dateToString: { format: "%Y-%m-%d", date: "$date" }
+//           },
+//           count: { $sum: 1 }
+//         }
+//       },
+//       { $sort: { '_id': 1 } }
+//     ]);
+
+//     // Compter les réservations par semaine
+//     const weeklyCounts = await Reservation.aggregate([
+//       { $match: matchStage },
+//       {
+//         $group: {
+//           _id: {
+//             year: { $isoWeekYear: "$date" },
+//             week: { $isoWeek: "$date" }
+//           },
+//           count: { $sum: 1 }
+//         }
+//       },
+//       { $sort: { '_id.year': 1, '_id.week': 1 } }
+//     ]);
+
+//     // Compter les réservations par mois
+//     const monthlyCounts = await Reservation.aggregate([
+//       { $match: matchStage },
+//       {
+//         $group: {
+//           _id: {
+//             $dateToString: { format: "%Y-%m", date: "$date" }
+//           },
+//           count: { $sum: 1 }
+//         }
+//       },
+//       { $sort: { '_id': 1 } }
+//     ]);
+
+//     res.status(200).json({
+//       success: true,
+//       dailyCounts,
+//       weeklyCounts,
+//       monthlyCounts
+//     });
+
+//   } catch (error) {
+//     console.error("Erreur lors de la récupération des statistiques de réservations :", error);
+//     return res.status(500).json({ success: false, message: 'Erreur lors de la récupération des statistiques de réservations.' });
+//   }
+// });
+
 exports.getReservationCounts = asyncHandler(async (req, res) => {
   try {
-    const { startDate, endDate, status } = req.query;
+    const { startDate, endDate, status, fieldId } = req.query;
 
     let matchStage = {};
 
@@ -319,7 +388,7 @@ exports.getReservationCounts = asyncHandler(async (req, res) => {
     if (status) {
       matchStage.status = status;
     } else {
-      matchStage.status = 'pending';
+      matchStage.status = 'reserved';
     }
 
     // Filtrage par plage de dates si fourni
@@ -330,18 +399,41 @@ exports.getReservationCounts = asyncHandler(async (req, res) => {
       };
     }
 
+    // Filtrer par terrain si fieldId est fourni
+    if (fieldId) {
+      matchStage.fieldId = new mongoose.Types.ObjectId(fieldId);
+    }
+
     // Compter les réservations par jour
     const dailyCounts = await Reservation.aggregate([
       { $match: matchStage },
       {
         $group: {
           _id: {
-            $dateToString: { format: "%Y-%m-%d", date: "$date" }
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
+            fieldId: "$fieldId"
           },
           count: { $sum: 1 }
         }
       },
-      { $sort: { '_id': 1 } }
+      // Jointure pour obtenir le nom du terrain
+      {
+        $lookup: {
+          from: 'terrains',
+          localField: '_id.fieldId',
+          foreignField: '_id',
+          as: 'field'
+        }
+      },
+      { $unwind: '$field' },
+      {
+        $project: {
+          _id: 1,
+          count: 1,
+          fieldName: '$field.name'
+        }
+      },
+      { $sort: { '_id.date': 1 } }
     ]);
 
     // Compter les réservations par semaine
@@ -351,9 +443,27 @@ exports.getReservationCounts = asyncHandler(async (req, res) => {
         $group: {
           _id: {
             year: { $isoWeekYear: "$date" },
-            week: { $isoWeek: "$date" }
+            week: { $isoWeek: "$date" },
+            fieldId: "$fieldId"
           },
           count: { $sum: 1 }
+        }
+      },
+      // Jointure pour obtenir le nom du terrain
+      {
+        $lookup: {
+          from: 'terrains',
+          localField: '_id.fieldId',
+          foreignField: '_id',
+          as: 'field'
+        }
+      },
+      { $unwind: '$field' },
+      {
+        $project: {
+          _id: 1,
+          count: 1,
+          fieldName: '$field.name'
         }
       },
       { $sort: { '_id.year': 1, '_id.week': 1 } }
@@ -365,12 +475,31 @@ exports.getReservationCounts = asyncHandler(async (req, res) => {
       {
         $group: {
           _id: {
-            $dateToString: { format: "%Y-%m", date: "$date" }
+            year: { $year: "$date" },
+            month: { $month: "$date" },
+            fieldId: "$fieldId"
           },
           count: { $sum: 1 }
         }
       },
-      { $sort: { '_id': 1 } }
+      // Jointure pour obtenir le nom du terrain
+      {
+        $lookup: {
+          from: 'terrains',
+          localField: '_id.fieldId',
+          foreignField: '_id',
+          as: 'field'
+        }
+      },
+      { $unwind: '$field' },
+      {
+        $project: {
+          _id: 1,
+          count: 1,
+          fieldName: '$field.name'
+        }
+      },
+      { $sort: { '_id.year': 1, '_id.month': 1 } }
     ]);
 
     res.status(200).json({
@@ -487,6 +616,65 @@ const generateTimeSlots = (start, end) => {
   return timeSlots;
 };
 
+// exports.getFieldAvailability = asyncHandler(async (req, res) => {
+//   const fieldId = req.params.id;
+//   const date = req.query.date;
+
+//   if (!date) {
+//     return res.status(400).json({ success: false, message: 'La date est requise.' });
+//   }
+
+//   // Vérification que la date est au format correct
+//   const selectedDate = new Date(date);
+//   if (isNaN(selectedDate.getTime())) {
+//     return res.status(400).json({ success: false, message: 'Format de la date invalide.' });
+//   }
+
+//   // Récupérer toutes les réservations pour le terrain donné à la date spécifiée
+//   const reservations = await Reservation.find({
+//     fieldId,
+//     date: { $eq: selectedDate.toISOString().split('T')[0] }
+//   });
+
+//   console.log("Réservations récupérées :", reservations);
+
+//   // Définir une plage horaire (ex: de 08:00 à 22:00)
+//   const startOfDay = new Date(selectedDate);
+//   startOfDay.setHours(8, 0, 0); // 08:00
+
+//   const endOfDay = new Date(selectedDate);
+//   endOfDay.setHours(22, 0, 0); // 22:00
+
+//   // Générer toutes les plages horaires de la journée
+//   const allTimeSlots = generateTimeSlots(startOfDay, endOfDay);
+
+//   // Marquer les créneaux réservés
+//   const reservedTimes = reservations.map(reservation => ({
+//     startTime: reservation.startTime,
+//     endTime: reservation.endTime,
+//   }));
+
+//   // Vérifier la disponibilité de chaque créneau
+//   const availableTimeSlots = allTimeSlots.map(slot => {
+//     const isReserved = reservedTimes.some(reserved => 
+//       (slot.startTime >= reserved.startTime && slot.startTime < reserved.endTime) ||
+//       (slot.endTime > reserved.startTime && slot.endTime <= reserved.endTime)
+//     );
+    
+//     return {
+//       ...slot,
+//       isReserved
+//     };
+//   });
+
+//   res.status(200).json({ success: true, availableTimeSlots });
+// });
+
+const convertTimeToMinutes = (timeString) => {
+  const [hour, minute] = timeString.split(":").map(Number);
+  return hour * 60 + minute;
+};
+
 exports.getFieldAvailability = asyncHandler(async (req, res) => {
   const fieldId = req.params.id;
   const date = req.query.date;
@@ -507,8 +695,6 @@ exports.getFieldAvailability = asyncHandler(async (req, res) => {
     date: { $eq: selectedDate.toISOString().split('T')[0] }
   });
 
-  console.log("Réservations récupérées :", reservations);
-
   // Définir une plage horaire (ex: de 08:00 à 22:00)
   const startOfDay = new Date(selectedDate);
   startOfDay.setHours(8, 0, 0); // 08:00
@@ -519,19 +705,31 @@ exports.getFieldAvailability = asyncHandler(async (req, res) => {
   // Générer toutes les plages horaires de la journée
   const allTimeSlots = generateTimeSlots(startOfDay, endOfDay);
 
-  // Marquer les créneaux réservés
-  const reservedTimes = reservations.map(reservation => ({
-    startTime: reservation.startTime,
-    endTime: reservation.endTime,
-  }));
+  // Collecter tous les créneaux réservés
+  const reservedTimeSlots = [];
+  reservations.forEach((reservation) => {
+    const timeSlotsString = reservation.startTime; // Récupérer la chaîne de créneaux horaires
+    const timeSlotsArray = timeSlotsString.split(','); // Diviser la chaîne en tableau
+
+    timeSlotsArray.forEach((slot) => {
+      const [startTime, endTime] = slot.split('-');
+      reservedTimeSlots.push({ startTime, endTime });
+    });
+  });
 
   // Vérifier la disponibilité de chaque créneau
   const availableTimeSlots = allTimeSlots.map(slot => {
-    const isReserved = reservedTimes.some(reserved => 
-      (slot.startTime >= reserved.startTime && slot.startTime < reserved.endTime) ||
-      (slot.endTime > reserved.startTime && slot.endTime <= reserved.endTime)
-    );
-    
+    const slotStart = convertTimeToMinutes(slot.startTime);
+    const slotEnd = convertTimeToMinutes(slot.endTime);
+
+    const isReserved = reservedTimeSlots.some(reserved => {
+      const reservedStart = convertTimeToMinutes(reserved.startTime);
+      const reservedEnd = convertTimeToMinutes(reserved.endTime);
+      return (
+        slotStart === reservedStart && slotEnd === reservedEnd
+      );
+    });
+
     return {
       ...slot,
       isReserved
@@ -540,4 +738,3 @@ exports.getFieldAvailability = asyncHandler(async (req, res) => {
 
   res.status(200).json({ success: true, availableTimeSlots });
 });
-
